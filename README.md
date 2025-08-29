@@ -1,0 +1,1 @@
+# camascope-automation
