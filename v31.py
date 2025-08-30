@@ -58,6 +58,7 @@ class FixedDropdownAutomator:
         self.wait = WebDriverWait(self.driver, 20)
         self.short_wait = WebDriverWait(self.driver, 5)
         self.progress_file = "chunking_progress.json"
+
     def automated_login(self, target_url):
         """
         Automates the 3-step login process and navigates to the reports page.
@@ -199,8 +200,8 @@ class FixedDropdownAutomator:
                 first_selection = self.driver.find_element(By.CSS_SELECTOR, ".badge.border.border-primary.text-primary")
                 # Get the text content, excluding the X button
                 text_content = first_selection.text.strip()
-                # Remove the Ã— character if present
-                if text_content.endswith('Ã—'):
+                # Remove the × character if present
+                if text_content.endswith('×'):
                     text_content = text_content[:-1].strip()
                 if text_content:
                     return text_content
@@ -212,7 +213,7 @@ class FixedDropdownAutomator:
                 selected_spans = self.driver.find_elements(By.CSS_SELECTOR, ".css-1pahdxg-control .badge span")
                 if selected_spans:
                     first_text = selected_spans[0].text.strip()
-                    if first_text and first_text != 'Ã—':
+                    if first_text and first_text != '×':
                         return first_text
             except:
                 pass
@@ -223,7 +224,7 @@ class FixedDropdownAutomator:
                 spans = control_container.find_elements(By.TAG_NAME, "span")
                 for span in spans:
                     text = span.text.strip()
-                    if text and text != 'Ã—' and 'Select' not in text:
+                    if text and text != '×' and 'Select' not in text:
                         return text
             except:
                 pass
@@ -242,18 +243,18 @@ class FixedDropdownAutomator:
 
         # Common character replacements for HTML entities and encoding issues
         replacements = {
-            '&amp;': '&',  # ampersand
-            '&lt;': '<',   # less than
-            '&gt;': '>',   # greater than
+            'ÃƒÂ¢Ã¢â€šÂ¬"': '—', # em dash
+            'ÃƒÂ¢Ã¢â€šÂ¬"': '—', # em dash (alternative encoding)
+            'ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å"': ''', # left single quotation mark
+            'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢': ''', # right single quotation mark
+            'ÃƒÂ¢Ã¢â€šÂ¬Ã…"': '"', # left double quotation mark
+            'ÃƒÂ¢Ã¢â€šÂ¬': '"', # right double quotation mark
+            'ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦': '…', # horizontal ellipsis
+            '&amp;': '&', # ampersand
+            '&lt;': '<', # less than
+            '&gt;': '>', # greater than
             '&quot;': '"', # quotation mark
-            '&#39;': "'",  # apostrophe
-            '\u2013': '-', # en dash
-            '\u2014': '-', # em dash
-            '\u2018': "'", # left single quotation mark
-            '\u2019': "'", # right single quotation mark
-            '\u201c': '"', # left double quotation mark
-            '\u201d': '"', # right double quotation mark
-            '\u2026': '...', # horizontal ellipsis
+            '&#39;': "'", # apostrophe
         }
 
         normalized = text
@@ -289,7 +290,7 @@ class FixedDropdownAutomator:
         original_names = [str(name) for name in df[column_name if column_name in df.columns else df.columns[1]].tolist() if pd.notna(name)]
         for i, (orig, norm) in enumerate(zip(original_names, names)):
             if orig != norm:
-                print(f"Normalized: '{orig}' â†' '{norm}'")
+                print(f"Normalized: '{orig}' → '{norm}'")
 
         return names, df
 
@@ -558,6 +559,8 @@ class FixedDropdownAutomator:
             print(f"Error in select_all_from_dropdown: {e}")
             return False
 
+    # ============= NEW REPORT GENERATION METHODS =============
+
     def find_and_click_generate_button(self):
         """
         Finds the 'Generate Report' button and clicks it.
@@ -684,6 +687,7 @@ class FixedDropdownAutomator:
 
         print("Report generation completed successfully!")
         return True
+
     def save_chunking_progress(self, session_data):
         """Save chunking progress to file"""
         try:
@@ -852,126 +856,70 @@ class FixedDropdownAutomator:
         report_success = self.generate_report_for_current_selections()
 
         return successful_selections, failed_selections, report_success
-def consolidate_csv_files(self, directory, downloaded_files_count):
-    """Consolidates multiple CSV files from a directory into a single file with Region mapping."""
-    print("\n" + "="*50)
-    print("CONSOLIDATING CSV FILES WITH REGION MAPPING")
-    print("="*50)
-
-    # Get the list of all CSV files in the download directory
-    csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
-    
-    if not csv_files:
-        print("No CSV files found to consolidate.")
-        return
-
-    print(f"Found {len(csv_files)} CSV files in '{directory}'.")
-    
-    # Check if the downloaded count matches the found count
-    if len(csv_files) != downloaded_files_count:
-        print(f"WARNING: Expected {downloaded_files_count} files, but found {len(csv_files)}. "
-              f"Some files may not have finished downloading. Proceeding anyway...")
-
-    # Load the master list for region mapping
-    master_file_path = NAMES_FILE  # Use the global NAMES_FILE variable
-    print(f"Loading master list from: '{master_file_path}'")
-    
-    try:
-        if master_file_path.endswith('.csv'):
-            master_df = pd.read_csv(master_file_path, encoding='utf-8-sig')
-        elif master_file_path.endswith(('.xlsx', '.xls')):
-            master_df = pd.read_excel(master_file_path)
-        else:
-            print("Master file must be CSV or Excel format. Proceeding without region mapping.")
-            master_df = None
-    except Exception as e:
-        print(f"Error loading master file: {e}. Proceeding without region mapping.")
-        master_df = None
-
-    # Create region lookup dictionary if master file loaded successfully
-    region_lookup = {}
-    if master_df is not None and 'Location Name' in master_df.columns and 'Region' in master_df.columns:
-        print("Creating region lookup dictionary...")
-        for _, row in master_df.iterrows():
-            if pd.notna(row['Location Name']) and pd.notna(row['Region']):
-                location_name = self.normalize_text(str(row['Location Name']))
-                region = str(row['Region']).strip()
-                region_lookup[location_name] = region
-        print(f"Region lookup created with {len(region_lookup)} entries")
-    else:
-        print("Master file doesn't have required columns 'Location Name' and 'Region'. Proceeding without region mapping.")
-
-    # Create a new directory for the merged file
-    merged_dir = os.path.join(directory, "Merged_Reports")
-    if not os.path.exists(merged_dir):
-        os.makedirs(merged_dir)
-        print(f"Created directory for merged reports: '{merged_dir}'")
-    
-    merged_file_path = os.path.join(merged_dir, f"Consolidated_MAR_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
-    
-    # Initialize consolidated dataframe
-    consolidated_df = pd.DataFrame()
-    
-    # Process each CSV file
-    for i, filename in enumerate(csv_files):
-        file_path = os.path.join(directory, filename)
-        try:
-            df = pd.read_csv(file_path)
-            print(f"Processing file {i+1}/{len(csv_files)}: '{filename}' ({len(df)} rows)")
-            
-            # Add Region column if we have the lookup data and the file has 'Care Service' column
-            if region_lookup and 'Care Service' in df.columns:
-                print("  Mapping regions based on Care Service...")
-                
-                # Create Region column by mapping Care Service to Location Name in master list
-                df['Region'] = df['Care Service'].apply(lambda x: 
-                    region_lookup.get(self.normalize_text(str(x)) if pd.notna(x) else '', 'Unknown Region')
-                )
-                
-                # Count successful mappings
-                mapped_count = len(df[df['Region'] != 'Unknown Region'])
-                total_count = len(df)
-                print(f"  Successfully mapped {mapped_count}/{total_count} records to regions")
-                
-                if mapped_count < total_count:
-                    unmapped_services = df[df['Region'] == 'Unknown Region']['Care Service'].unique()[:5]
-                    print(f"  Sample unmapped Care Services: {list(unmapped_services)}")
-            
-            elif not region_lookup:
-                print("  No region lookup available - adding placeholder Region column")
-                df['Region'] = 'No Region Data'
-            elif 'Care Service' not in df.columns:
-                print(f"  WARNING: 'Care Service' column not found in {filename}. Available columns: {list(df.columns)}")
-                df['Region'] = 'Missing Care Service Column'
-            
-            # Append to consolidated dataframe
-            if consolidated_df.empty:
-                consolidated_df = df
-            else:
-                # Use concat instead of append (which is deprecated)
-                consolidated_df = pd.concat([consolidated_df, df], ignore_index=True)
-                
-        except Exception as e:
-            print(f"  Error processing '{filename}': {e}. Skipping this file.")
-    
-    # Save the consolidated file
-    try:
-        consolidated_df.to_csv(merged_file_path, index=False)
-        print(f"\nConsolidation complete!")
-        print(f"Final merged report saved to: '{merged_file_path}'")
-        print(f"Total consolidated records: {len(consolidated_df)}")
         
-        # Show region distribution if regions were mapped
-        if 'Region' in consolidated_df.columns and region_lookup:
-            print(f"\nRegion distribution in consolidated file:")
-            region_counts = consolidated_df['Region'].value_counts()
-            for region, count in region_counts.head(10).items():
-                print(f"  {region}: {count} records")
-            if len(region_counts) > 10:
-                print(f"  ... and {len(region_counts) - 10} more regions")
-                
-    except Exception as e:
-        print(f"Error saving consolidated file: {e}")
+    def consolidate_csv_files(self, directory, downloaded_files_count):
+        """Consolidates multiple CSV files from a directory into a single file."""
+        print("\n" + "="*50)
+        print("CONSOLIDATING CSV FILES")
+        print("="*50)
+
+        # Get the list of all CSV files in the download directory
+        csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
+        
+        if not csv_files:
+            print("No CSV files found to consolidate.")
+            return
+
+        print(f"Found {len(csv_files)} CSV files in '{directory}'.")
+        
+        # Check if the downloaded count matches the found count
+        if len(csv_files) != downloaded_files_count:
+            print(f"WARNING: Expected {downloaded_files_count} files, but found {len(csv_files)}. "
+                  f"Some files may not have finished downloading. Proceeding anyway...")
+
+        # Create a new directory for the merged file
+        merged_dir = os.path.join(directory, "Merged_Reports")
+        if not os.path.exists(merged_dir):
+            os.makedirs(merged_dir)
+            print(f"Created directory for merged reports: '{merged_dir}'")
+        
+        merged_file_path = os.path.join(merged_dir, f"Consolidated_MAR_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+        
+        # Read the first CSV file to get the header
+        first_file = os.path.join(directory, csv_files[0])
+        try:
+            df = pd.read_csv(first_file)
+            print(f"Reading first file to get header: '{csv_files[0]}'")
+            
+            # Write the header to the merged file
+            df.to_csv(merged_file_path, index=False)
+        except Exception as e:
+            print(f"Error reading first file '{first_file}': {e}. Cannot consolidate without a valid header.")
+            return
+
+        # Append the rest of the CSV files
+        for filename in csv_files[1:]:
+            file_path = os.path.join(directory, filename)
+            try:
+                df = pd.read_csv(file_path)
+                df.to_csv(merged_file_path, mode='a', header=False, index=False)
+                print(f"Appended: '{filename}'")
+            except Exception as e:
+                print(f"Error processing '{filename}': {e}. Skipping this file.")
+        
+        print("\nConsolidation complete!")
+        print(f"Final merged report saved to: '{merged_file_path}'")
+        
+        # --- ORIGINAL CLEANUP LOGIC REMOVED PER USER REQUEST ---
+        # print("Cleaning up individual CSV files...")
+        # for filename in csv_files:
+        #     file_path = os.path.join(directory, filename)
+        #     try:
+        #         os.remove(file_path)
+        #         # print(f"  Deleted '{filename}'")
+        #     except OSError as e:
+        #         print(f"  Error deleting file '{file_path}': {e}")
+        # print("Cleanup complete.")
 
     def process_in_chunks(self, names_file, column_name="Location Name"):
         """Main function for chunked processing (manual report generation)"""
@@ -1128,6 +1076,7 @@ def consolidate_csv_files(self, directory, downloaded_files_count):
             chunk_size = progress_data['chunk_size']
 
             print(f"\nResuming with {len(names)} items, chunk size {chunk_size}")
+
         # Process chunks starting from current position
         start_chunk = progress_data['current_chunk']
         total_chunks = len(chunks)
@@ -1152,6 +1101,15 @@ def consolidate_csv_files(self, directory, downloaded_files_count):
                 print(f"  {i+1}. '{item}'")
             if len(chunk['items']) > 3:
                 print(f"  ... and {len(chunk['items']) - 3} more")
+
+            # --- ORIGINAL CLEAR LOGIC REMOVED PER USER REQUEST ---
+            # Clear any existing selections before starting new chunk
+            # if chunk_num > 1 or resume_session:
+            #     print("Clearing previous selections...")
+            #     clear_success = self.clear_all_selections()
+            #     if not clear_success:
+            #         print("Clear failed - continuing anyway...")
+            #     time.sleep(0.08)
 
             # Process the chunk
             successful, failed = self.process_chunk(chunk, chunk_num, total_chunks)
@@ -1210,6 +1168,7 @@ def consolidate_csv_files(self, directory, downloaded_files_count):
         else:
             print("\nEnding script...")
             input("Press Enter to close browser...")
+
     def process_in_chunks_with_auto_reports(self, names_file, column_name="Location Name", download_directory=None):
         """
         Main function for chunked processing with automatic report generation.
@@ -1363,7 +1322,8 @@ def consolidate_csv_files(self, directory, downloaded_files_count):
             chunk_size = progress_data['chunk_size']
 
             print(f"\nResuming with {len(names)} items, chunk size {chunk_size}")
-            # Process chunks starting from current position
+
+        # Process chunks starting from current position
         start_chunk = progress_data['current_chunk']
         total_chunks = len(chunks)
         successful_reports = 0
@@ -1378,6 +1338,15 @@ def consolidate_csv_files(self, directory, downloaded_files_count):
 
         for chunk_num in range(start_chunk, total_chunks + 1):
             chunk = chunks[chunk_num - 1] # Convert to 0-based index
+
+            # --- ORIGINAL CLEAR LOGIC REMOVED PER USER REQUEST ---
+            # Clear any existing selections before starting new chunk
+            # if chunk_num > 1 or resume_session:
+            #     print("Clearing previous selections...")
+            #     clear_success = self.clear_all_selections()
+            #     if not clear_success:
+            #         print("Clear failed - continuing anyway...")
+            #     time.sleep(0.08)
 
             # Process the chunk with automatic report generation
             successful, failed, report_success = self.process_chunk_with_auto_report(chunk, chunk_num, total_chunks)
@@ -1434,7 +1403,7 @@ def consolidate_csv_files(self, directory, downloaded_files_count):
 
         if next_action == "1":
             print("\nStarting new automated chunking session...")
-            self.process_in_chunks_with_auto_reports(names_file, column_name, download_directory)
+            self.process_in_chunks_with_auto_reports(names_file, column_name)
         elif next_action == "2":
             print("\nReturning to main menu...")
             self.select_multiple_items_from_current_page(names_file, column_name)
@@ -1564,6 +1533,31 @@ def consolidate_csv_files(self, directory, downloaded_files_count):
 
                 input("Press Enter after you've finished with the report...")
 
+                # --- ORIGINAL NEXT ACTIONS MENU REMOVED PER USER REQUEST ---
+                # print("\nWhat would you like to do next?")
+                # print("1. Clear current selections and start new report")
+                # print("2. Start new report (keep current selections)")
+                # print("3. End script and close browser")
+
+                # next_action = input("Select option (1, 2, or 3): ").strip()
+
+                # if next_action == "1":
+                #     print("\nClearing current selections...")
+                #     clear_success = self.clear_all_selections()
+                #     if clear_success:
+                #         print("Selections cleared! Starting fresh...")
+                #         self.select_multiple_items_from_current_page(names_file, column_name)
+                #     else:
+                #         print("Clear operation had issues. Please verify manually.")
+                #         input("Press Enter when ready...")
+                #         self.select_multiple_items_from_current_page(names_file, column_name)
+                # elif next_action == "2":
+                #     print("\nStarting new report (keeping current selections)...")
+                #     self.select_multiple_items_from_current_page(names_file, column_name)
+                # else:
+                #     print("\nEnding script...")
+                #     input("Press Enter to close browser...")
+                #     return
                 return
             else:
                 print("Select All failed. Falling back to individual selection method.")
@@ -1584,7 +1578,8 @@ def consolidate_csv_files(self, directory, downloaded_files_count):
         if verify.lower() != 'y':
             print("Please check your selection and restart the script")
             return
-            print("\n" + "="*70)
+
+        print("\n" + "="*70)
         print("ENHANCED SELECTION MODE")
         print("Instructions:")
         print("  1. Make sure you're on the page with the dropdown")
@@ -1684,7 +1679,8 @@ def consolidate_csv_files(self, directory, downloaded_files_count):
     def close(self):
         """Close the browser"""
         self.driver.quit()
-        # Example usage
+
+# Example usage
 if __name__ == "__main__":
     # CONFIGURATION - Easy to modify
     NAMES_FILE = r"C:\Users\MarkCooper-NCG\OneDrive - National Care Group\Documents\camascope\Camascope Query\full_checkbox_list_checkbox_ID.csv"
@@ -1738,5 +1734,4 @@ if __name__ == "__main__":
 
     finally:
         # Close browser
-
         automator.close()
