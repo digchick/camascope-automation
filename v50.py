@@ -296,11 +296,11 @@ class FixedDropdownAutomator:
 
     def find_clickable_dropdown_option(self, target_text):
         """
-        Find the actual clickable dropdown option element using multiple strategies including hyphen-based matching
+        Find the actual clickable dropdown option element using multiple strategies
         """
         print(f"Finding clickable element for: '{target_text}'")
 
-        # Strategy 1: Target dropdown menu options specifically with exact match
+        # Strategy 1: Target dropdown menu options specifically
         specific_selectors = [
             f"//div[contains(@class, 'option')]//span[@class='me-2' and text()='{target_text}']",
             f"//div[contains(@class, 'option')]//span[text()='{target_text}']",
@@ -310,61 +310,19 @@ class FixedDropdownAutomator:
             f"//div[contains(@class, 'option')]//text()[.='{target_text}']/parent::*"
         ]
 
-        # Try exact match selectors first
+        # Try specific selectors first
         for selector in specific_selectors:
             try:
                 elements = self.driver.find_elements(By.XPATH, selector)
                 if elements:
                     element = elements[0]
                     if element.is_displayed() and element.is_enabled():
-                        print(f"Found exact match using: {selector[:50]}...")
+                        print(f"Found clickable element using: {selector[:50]}...")
                         return element
             except:
                 continue
 
-        # Strategy 2: Enhanced hyphen-based matching
-        print("Exact match failed, trying hyphen-based matching...")
-        try:
-            # Get all dropdown options
-            all_options = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'option')]")
-            
-            # Parse target text for hyphen matching
-            target_normalized = self.normalize_text(target_text)
-            target_parts = None
-            if ' - ' in target_normalized:
-                target_parts = [part.strip() for part in target_normalized.split(' - ', 1)]
-                print(f"Target parts: '{target_parts[0]}' and '{target_parts[1]}'")
-            
-            for option in all_options:
-                try:
-                    if not (option.is_displayed() and option.is_enabled()):
-                        continue
-                        
-                    option_text = option.text.strip()
-                    if not option_text:
-                        continue
-                    
-                    option_normalized = self.normalize_text(option_text)
-                    
-                    # Try hyphen-based matching if both have hyphens
-                    if target_parts and ' - ' in option_normalized:
-                        option_parts = [part.strip() for part in option_normalized.split(' - ', 1)]
-                        if len(option_parts) == 2:
-                            # Match both parts independently
-                            part1_match = target_parts[0].lower() == option_parts[0].lower()
-                            part2_match = target_parts[1].lower() == option_parts[1].lower()
-                            
-                            if part1_match and part2_match:
-                                print(f"Found hyphen-based match: '{option_text}' matches '{target_text}'")
-                                return option
-                                
-                except Exception as e:
-                    continue
-                    
-        except Exception as e:
-            print(f"Hyphen-based matching failed: {e}")
-
-        # Strategy 3: Fallback to general selector but filter for clickable elements
+        # Strategy 2: Fallback to general selector but filter for clickable elements
         print("Trying fallback general selector...")
         try:
             general_elements = self.driver.find_elements(By.XPATH, f"//*[text()='{target_text}']")
@@ -427,14 +385,14 @@ class FixedDropdownAutomator:
                             dropdown_xpath = f"//div[./span[text()='{current_anchor}']]"
                         else:
                             dropdown_xpath = "//div[text()='Select...']"
-                        time.sleep(0.1) # Brief pause before retry
+                        time.sleep(0.08) # Brief pause before retry
                         continue
                     else:
                         raise dropdown_error # Re-raise if not stale element or max retries reached
 
             # Step 2: Wait for dropdown to load and find the clickable element
             print(f"Looking for clickable option: '{target_text}'...")
-            time.sleep(0.1) # Give dropdown time to fully load
+            time.sleep(0.08) # Give dropdown time to fully load
 
             # Use enhanced element finding
             option_element = self.find_clickable_dropdown_option(target_text)
@@ -513,12 +471,12 @@ class FixedDropdownAutomator:
                     EC.element_to_be_clickable((By.XPATH, fresh_dropdown_xpath))
                 )
                 fresh_dropdown_button.click()
-                time.sleep(0.1)
+                time.sleep(0.08)
                 print("Dropdown reopened")
 
                 # Step 4: Click Select All again to deselect everything
                 print("Looking for 'Select All' element again to deselect...")
-                time.sleep(0.1)
+                time.sleep(0.08)
                 select_all_elements = self.driver.find_elements(By.XPATH, "//*[text()='Select All']")
 
                 if select_all_elements:
@@ -527,7 +485,7 @@ class FixedDropdownAutomator:
 
                     # Use JavaScript click to avoid stale element issues
                     self.driver.execute_script("arguments[0].click();", select_all_fresh)
-                    time.sleep(0.1) # Wait for deselection to complete
+                    time.sleep(0.08) # Wait for deselection to complete
 
                     print("All selections cleared!")
                     return True
@@ -566,7 +524,7 @@ class FixedDropdownAutomator:
                     EC.element_to_be_clickable((By.XPATH, dropdown_xpath))
                 )
                 dropdown_button.click()
-                time.sleep(0.1)
+                time.sleep(0.08)
                 print("Dropdown opened successfully")
             except Exception as e:
                 print(f"Failed to open dropdown: {e}")
@@ -582,7 +540,7 @@ class FixedDropdownAutomator:
                 print("Clicking 'Select All'...")
                 # Use JavaScript click for reliability
                 self.driver.execute_script("arguments[0].click();", select_all_element)
-                time.sleep(0.1) # Wait for all selections to register
+                time.sleep(0.08) # Wait for all selections to register
 
                 # Verify selection worked by checking for "All units" or selected items
                 current_selection = self.get_current_first_selection()
@@ -833,7 +791,7 @@ class FixedDropdownAutomator:
                 failed_selections.append(name)
                 consecutive_failures += 1
 
-            time.sleep(0.1) # Small delay between selections
+            time.sleep(0.08) # Small delay between selections
 
         # Chunk summary
         print(f"\n{'='*50}")
@@ -879,7 +837,7 @@ class FixedDropdownAutomator:
             else:
                 failed_selections.append(name)
 
-            time.sleep(0.1) # Small delay between selections
+            time.sleep(0.08) # Small delay between selections
 
         # Chunk selection summary
         print(f"\n{'='*50}")
@@ -1209,7 +1167,7 @@ class FixedDropdownAutomator:
                 clear_success = self.clear_all_selections()
                 if not clear_success:
                     print("Clear failed - continuing anyway...")
-                time.sleep(0.1)
+                time.sleep(0.08)
 
             # Process the chunk
             successful, failed = self.process_chunk(chunk, chunk_num, total_chunks)
@@ -1445,7 +1403,7 @@ class FixedDropdownAutomator:
                 clear_success = self.clear_all_selections()
                 if not clear_success:
                     print("Clear failed - continuing anyway...")
-                time.sleep(0.1)
+                time.sleep(0.08)
 
             # Process the chunk with automatic report generation
             successful, failed, report_success = self.process_chunk_with_auto_report(chunk, chunk_num, total_chunks)
@@ -1470,7 +1428,7 @@ class FixedDropdownAutomator:
             # Brief pause between chunks
             if chunk_num < total_chunks:
                 print("Brief pause before next chunk...")
-                time.sleep(0.1)
+                time.sleep(0.08)
 
         # Final summary
         print(f"\n{'='*70}")
@@ -1713,7 +1671,7 @@ class FixedDropdownAutomator:
             print(f"Running total: {successful_selections} success, {len(failed_selections)} failed")
 
             # Small delay between selections
-            time.sleep(0.1)
+            time.sleep(0.08)
 
         # Summary
         print(f"\n" + "="*60)
@@ -1853,4 +1811,3 @@ if __name__ == "__main__":
     finally:
         # Close browser
         automator.close()
-
