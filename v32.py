@@ -857,126 +857,173 @@ class FixedDropdownAutomator:
 
         return successful_selections, failed_selections, report_success
         
-    def consolidate_csv_files(self, directory, downloaded_files_count):
-        """Consolidates multiple CSV files from a directory into a single file with Region mapping."""
-        print("\n" + "="*50)
-        print("CONSOLIDATING CSV FILES WITH REGION MAPPING")
-        print("="*50)
+def consolidate_csv_files(self, directory, downloaded_files_count):
+    """Consolidates multiple CSV files from a directory into a single file with Region, Business ID, and Location Address mapping."""
+    print("\n" + "="*50)
+    print("CONSOLIDATING CSV FILES WITH ENHANCED MAPPING")
+    print("="*50)
 
-        # Get the list of all CSV files in the download directory
-        csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
-        
-        if not csv_files:
-            print("No CSV files found to consolidate.")
-            return
+    # Get the list of all CSV files in the download directory
+    csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
+    
+    if not csv_files:
+        print("No CSV files found to consolidate.")
+        return
 
-        print(f"Found {len(csv_files)} CSV files in '{directory}'.")
-        
-        # Check if the downloaded count matches the found count
-        if len(csv_files) != downloaded_files_count:
-            print(f"WARNING: Expected {downloaded_files_count} files, but found {len(csv_files)}. "
-                  f"Some files may not have finished downloading. Proceeding anyway...")
+    print(f"Found {len(csv_files)} CSV files in '{directory}'.")
+    
+    # Check if the downloaded count matches the found count
+    if len(csv_files) != downloaded_files_count:
+        print(f"WARNING: Expected {downloaded_files_count} files, but found {len(csv_files)}. "
+              f"Some files may not have finished downloading. Proceeding anyway...")
 
-        # Load the master list for region mapping
-        master_file_path = NAMES_FILE  # Use the global NAMES_FILE variable
-        print(f"Loading master list from: '{master_file_path}'")
-        
-        try:
-            if master_file_path.endswith('.csv'):
-                master_df = pd.read_csv(master_file_path, encoding='utf-8-sig')
-            elif master_file_path.endswith(('.xlsx', '.xls')):
-                master_df = pd.read_excel(master_file_path)
-            else:
-                print("Master file must be CSV or Excel format. Proceeding without region mapping.")
-                master_df = None
-        except Exception as e:
-            print(f"Error loading master file: {e}. Proceeding without region mapping.")
-            master_df = None
-
-        # Create region lookup dictionary if master file loaded successfully
-        region_lookup = {}
-        if master_df is not None and 'Location Name' in master_df.columns and 'Region' in master_df.columns:
-            print("Creating region lookup dictionary...")
-            for _, row in master_df.iterrows():
-                if pd.notna(row['Location Name']) and pd.notna(row['Region']):
-                    location_name = self.normalize_text(str(row['Location Name']))
-                    region = str(row['Region']).strip()
-                    region_lookup[location_name] = region
-            print(f"Region lookup created with {len(region_lookup)} entries")
+    # Load the master list for enhanced mapping
+    master_file_path = NAMES_FILE  # Use the global NAMES_FILE variable
+    print(f"Loading master list from: '{master_file_path}'")
+    
+    try:
+        if master_file_path.endswith('.csv'):
+            master_df = pd.read_csv(master_file_path, encoding='utf-8-sig')
+        elif master_file_path.endswith(('.xlsx', '.xls')):
+            master_df = pd.read_excel(master_file_path)
         else:
-            print("Master file doesn't have required columns 'Location Name' and 'Region'. Proceeding without region mapping.")
+            print("Master file must be CSV or Excel format. Proceeding without enhanced mapping.")
+            master_df = None
+    except Exception as e:
+        print(f"Error loading master file: {e}. Proceeding without enhanced mapping.")
+        master_df = None
 
-        # Create a new directory for the merged file
-        merged_dir = os.path.join(directory, "Merged_Reports")
-        if not os.path.exists(merged_dir):
-            os.makedirs(merged_dir)
-            print(f"Created directory for merged reports: '{merged_dir}'")
+    # Create enhanced lookup dictionary if master file loaded successfully
+    location_lookup = {}
+    required_columns = ['Location Name', 'Region', 'Business ID', 'Location Address']
+    
+    if master_df is not None:
+        print("Checking for required columns...")
+        available_columns = master_df.columns.tolist()
+        missing_columns = [col for col in required_columns if col not in available_columns]
         
-        merged_file_path = os.path.join(merged_dir, f"Consolidated_MAR_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+        if missing_columns:
+            print(f"WARNING: Missing columns in master file: {missing_columns}")
+            print(f"Available columns: {available_columns}")
         
-        # Initialize consolidated dataframe
-        consolidated_df = pd.DataFrame()
-        
-        # Process each CSV file
-        for i, filename in enumerate(csv_files):
-            file_path = os.path.join(directory, filename)
-            try:
-                df = pd.read_csv(file_path)
-                print(f"Processing file {i+1}/{len(csv_files)}: '{filename}' ({len(df)} rows)")
-                
-                # Add Region column if we have the lookup data and the file has 'Care Service' column
-                if region_lookup and 'Care Service' in df.columns:
-                    print("  Mapping regions based on Care Service...")
+        if 'Location Name' in master_df.columns:
+            print("Creating enhanced lookup dictionary...")
+            for _, row in master_df.iterrows():
+                if pd.notna(row['Location Name']):
+                    location_name = self.normalize_text(str(row['Location Name']))
                     
-                    # Create Region column by mapping Care Service to Location Name in master list
-                    df['Region'] = df['Care Service'].apply(lambda x: 
-                        region_lookup.get(self.normalize_text(str(x)) if pd.notna(x) else '', 'Unknown Region')
-                    )
-                    
-                    # Count successful mappings
-                    mapped_count = len(df[df['Region'] != 'Unknown Region'])
-                    total_count = len(df)
-                    print(f"  Successfully mapped {mapped_count}/{total_count} records to regions")
-                    
-                    if mapped_count < total_count:
-                        unmapped_services = df[df['Region'] == 'Unknown Region']['Care Service'].unique()[:5]
-                        print(f"  Sample unmapped Care Services: {list(unmapped_services)}")
-                
-                elif not region_lookup:
-                    print("  No region lookup available - adding placeholder Region column")
-                    df['Region'] = 'No Region Data'
-                elif 'Care Service' not in df.columns:
-                    print(f"  WARNING: 'Care Service' column not found in {filename}. Available columns: {list(df.columns)}")
-                    df['Region'] = 'Missing Care Service Column'
-                
-                # Append to consolidated dataframe
-                if consolidated_df.empty:
-                    consolidated_df = df
-                else:
-                    # Use concat instead of append (which is deprecated)
-                    consolidated_df = pd.concat([consolidated_df, df], ignore_index=True)
-                    
-            except Exception as e:
-                print(f"  Error processing '{filename}': {e}. Skipping this file.")
-        
-        # Save the consolidated file
-        try:
-            consolidated_df.to_csv(merged_file_path, index=False)
-            print(f"\nConsolidation complete!")
-            print(f"Final merged report saved to: '{merged_file_path}'")
-            print(f"Total consolidated records: {len(consolidated_df)}")
+                    # Create lookup entry with all available data
+                    lookup_entry = {
+                        'Region': str(row.get('Region', 'Unknown Region')).strip() if pd.notna(row.get('Region')) else 'Unknown Region',
+                        'Business ID': str(row.get('Business ID', 'Unknown Business ID')).strip() if pd.notna(row.get('Business ID')) else 'Unknown Business ID',
+                        'Location Address': str(row.get('Location Address', 'Unknown Address')).strip() if pd.notna(row.get('Location Address')) else 'Unknown Address'
+                    }
+                    location_lookup[location_name] = lookup_entry
             
-            # Show region distribution if regions were mapped
-            if 'Region' in consolidated_df.columns and region_lookup:
-                print(f"\nRegion distribution in consolidated file:")
-                region_counts = consolidated_df['Region'].value_counts()
-                for region, count in region_counts.head(10).items():
-                    print(f"  {region}: {count} records")
-                if len(region_counts) > 10:
-                    print(f"  ... and {len(region_counts) - 10} more regions")
-                    
+            print(f"Enhanced lookup created with {len(location_lookup)} entries")
+            print(f"Mapping: Care Service -> Region, Business ID, Location Address")
+        else:
+            print("Master file doesn't have 'Location Name' column. Proceeding without enhanced mapping.")
+    else:
+        print("No master file available for enhanced mapping.")
+
+    # Create a new directory for the merged file
+    merged_dir = os.path.join(directory, "Merged_Reports")
+    if not os.path.exists(merged_dir):
+        os.makedirs(merged_dir)
+        print(f"Created directory for merged reports: '{merged_dir}'")
+    
+    merged_file_path = os.path.join(merged_dir, f"Consolidated_MAR_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+    
+    # Initialize consolidated dataframe
+    consolidated_df = pd.DataFrame()
+    
+    # Process each CSV file
+    for i, filename in enumerate(csv_files):
+        file_path = os.path.join(directory, filename)
+        try:
+            df = pd.read_csv(file_path)
+            print(f"Processing file {i+1}/{len(csv_files)}: '{filename}' ({len(df)} rows)")
+            
+            # Add enhanced columns if we have the lookup data and the file has 'Care Service' column
+            if location_lookup and 'Care Service' in df.columns:
+                print("  Mapping enhanced data based on Care Service...")
+                
+                # Apply mapping for all three fields
+                def map_location_data(care_service):
+                    normalized_service = self.normalize_text(str(care_service)) if pd.notna(care_service) else ''
+                    return location_lookup.get(normalized_service, {
+                        'Region': 'Unknown Region',
+                        'Business ID': 'Unknown Business ID', 
+                        'Location Address': 'Unknown Address'
+                    })
+                
+                # Create new columns
+                df['Region'] = df['Care Service'].apply(lambda x: map_location_data(x)['Region'])
+                df['Business ID'] = df['Care Service'].apply(lambda x: map_location_data(x)['Business ID'])
+                df['Location Address'] = df['Care Service'].apply(lambda x: map_location_data(x)['Location Address'])
+                
+                # Count successful mappings
+                mapped_count = len(df[df['Region'] != 'Unknown Region'])
+                total_count = len(df)
+                print(f"  Successfully mapped {mapped_count}/{total_count} records")
+                
+                if mapped_count < total_count:
+                    unmapped_services = df[df['Region'] == 'Unknown Region']['Care Service'].unique()[:5]
+                    print(f"  Sample unmapped Care Services: {list(unmapped_services)}")
+            
+            elif not location_lookup:
+                print("  No lookup data available - adding placeholder columns")
+                df['Region'] = 'No Region Data'
+                df['Business ID'] = 'No Business ID Data'
+                df['Location Address'] = 'No Address Data'
+            elif 'Care Service' not in df.columns:
+                print(f"  WARNING: 'Care Service' column not found in {filename}. Available columns: {list(df.columns)}")
+                df['Region'] = 'Missing Care Service Column'
+                df['Business ID'] = 'Missing Care Service Column'
+                df['Location Address'] = 'Missing Care Service Column'
+            
+            # Append to consolidated dataframe
+            if consolidated_df.empty:
+                consolidated_df = df
+            else:
+                # Use concat instead of append (which is deprecated)
+                consolidated_df = pd.concat([consolidated_df, df], ignore_index=True)
+                
         except Exception as e:
-            print(f"Error saving consolidated file: {e}")
+            print(f"  Error processing '{filename}': {e}. Skipping this file.")
+    
+    # Save the consolidated file
+    try:
+        consolidated_df.to_csv(merged_file_path, index=False)
+        print(f"\nConsolidation complete!")
+        print(f"Final merged report saved to: '{merged_file_path}'")
+        print(f"Total consolidated records: {len(consolidated_df)}")
+        
+        # Show enhanced data distribution if mapping was applied
+        if location_lookup and 'Region' in consolidated_df.columns:
+            print(f"\nEnhanced mapping results:")
+            
+            # Region distribution
+            print(f"Region distribution:")
+            region_counts = consolidated_df['Region'].value_counts()
+            for region, count in region_counts.head(10).items():
+                print(f"  {region}: {count} records")
+            if len(region_counts) > 10:
+                print(f"  ... and {len(region_counts) - 10} more regions")
+            
+            # Summary of unknown entries
+            unknown_region = len(consolidated_df[consolidated_df['Region'] == 'Unknown Region'])
+            unknown_business = len(consolidated_df[consolidated_df['Business ID'] == 'Unknown Business ID'])
+            unknown_address = len(consolidated_df[consolidated_df['Location Address'] == 'Unknown Address'])
+            
+            print(f"\nMapping summary:")
+            print(f"  Unknown Regions: {unknown_region} records")
+            print(f"  Unknown Business IDs: {unknown_business} records") 
+            print(f"  Unknown Addresses: {unknown_address} records")
+                
+    except Exception as e:
+        print(f"Error saving consolidated file: {e}")
     def process_in_chunks(self, names_file, column_name="Location Name"):
         """Main function for chunked processing (manual report generation)"""
 
@@ -1790,4 +1837,5 @@ if __name__ == "__main__":
 
     finally:
         # Close browser
+
         automator.close()
