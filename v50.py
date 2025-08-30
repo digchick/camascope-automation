@@ -296,11 +296,11 @@ class FixedDropdownAutomator:
 
     def find_clickable_dropdown_option(self, target_text):
         """
-        Find the actual clickable dropdown option element using multiple strategies
+        Find the actual clickable dropdown option element using multiple strategies including hyphen-based matching
         """
         print(f"Finding clickable element for: '{target_text}'")
 
-        # Strategy 1: Target dropdown menu options specifically
+        # Strategy 1: Target dropdown menu options specifically with exact match
         specific_selectors = [
             f"//div[contains(@class, 'option')]//span[@class='me-2' and text()='{target_text}']",
             f"//div[contains(@class, 'option')]//span[text()='{target_text}']",
@@ -310,19 +310,61 @@ class FixedDropdownAutomator:
             f"//div[contains(@class, 'option')]//text()[.='{target_text}']/parent::*"
         ]
 
-        # Try specific selectors first
+        # Try exact match selectors first
         for selector in specific_selectors:
             try:
                 elements = self.driver.find_elements(By.XPATH, selector)
                 if elements:
                     element = elements[0]
                     if element.is_displayed() and element.is_enabled():
-                        print(f"Found clickable element using: {selector[:50]}...")
+                        print(f"Found exact match using: {selector[:50]}...")
                         return element
             except:
                 continue
 
-        # Strategy 2: Fallback to general selector but filter for clickable elements
+        # Strategy 2: Enhanced hyphen-based matching
+        print("Exact match failed, trying hyphen-based matching...")
+        try:
+            # Get all dropdown options
+            all_options = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'option')]")
+            
+            # Parse target text for hyphen matching
+            target_normalized = self.normalize_text(target_text)
+            target_parts = None
+            if ' - ' in target_normalized:
+                target_parts = [part.strip() for part in target_normalized.split(' - ', 1)]
+                print(f"Target parts: '{target_parts[0]}' and '{target_parts[1]}'")
+            
+            for option in all_options:
+                try:
+                    if not (option.is_displayed() and option.is_enabled()):
+                        continue
+                        
+                    option_text = option.text.strip()
+                    if not option_text:
+                        continue
+                    
+                    option_normalized = self.normalize_text(option_text)
+                    
+                    # Try hyphen-based matching if both have hyphens
+                    if target_parts and ' - ' in option_normalized:
+                        option_parts = [part.strip() for part in option_normalized.split(' - ', 1)]
+                        if len(option_parts) == 2:
+                            # Match both parts independently
+                            part1_match = target_parts[0].lower() == option_parts[0].lower()
+                            part2_match = target_parts[1].lower() == option_parts[1].lower()
+                            
+                            if part1_match and part2_match:
+                                print(f"Found hyphen-based match: '{option_text}' matches '{target_text}'")
+                                return option
+                                
+                except Exception as e:
+                    continue
+                    
+        except Exception as e:
+            print(f"Hyphen-based matching failed: {e}")
+
+        # Strategy 3: Fallback to general selector but filter for clickable elements
         print("Trying fallback general selector...")
         try:
             general_elements = self.driver.find_elements(By.XPATH, f"//*[text()='{target_text}']")
